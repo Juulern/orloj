@@ -175,13 +175,7 @@ func (b *NATSJetStreamAgentMessageBus) Consume(ctx context.Context, sub AgentMes
 		durable = fmt.Sprintf("agent-%s-%s", sanitizeSubjectToken(sub.Namespace), sanitizeSubjectToken(sub.Agent))
 	}
 
-	consumer, err := b.js.CreateOrUpdateConsumer(ctx, b.streamName, jetstream.ConsumerConfig{
-		Durable:       durable,
-		FilterSubject: subject,
-		AckPolicy:     jetstream.AckExplicitPolicy,
-		AckWait:       defaultConsumerAckWait,
-		MaxDeliver:    defaultConsumerMaxDeliver,
-	})
+	consumer, err := b.js.CreateOrUpdateConsumer(ctx, b.streamName, agentMessageConsumerConfig(durable, subject))
 	if err != nil {
 		return fmt.Errorf("create/update consumer %q: %w", durable, err)
 	}
@@ -238,4 +232,15 @@ func (b *NATSJetStreamAgentMessageBus) Close() error {
 	}
 	b.nc.Close()
 	return nil
+}
+
+func agentMessageConsumerConfig(durable, subject string) jetstream.ConsumerConfig {
+	return jetstream.ConsumerConfig{
+		Durable:       durable,
+		FilterSubject: subject,
+		DeliverPolicy: jetstream.DeliverNewPolicy,
+		AckPolicy:     jetstream.AckExplicitPolicy,
+		AckWait:       defaultConsumerAckWait,
+		MaxDeliver:    defaultConsumerMaxDeliver,
+	}
 }

@@ -20,6 +20,7 @@ import (
 )
 
 var hopPattern = regexp.MustCompile(`/h([0-9]+)(?:/|$)`) //nolint:gochecknoglobals
+const agentMessageDurableConfigVersion = "v2"
 
 // AgentRegistry lists and resolves declared agents for message consumer subscriptions/execution.
 type AgentRegistry interface {
@@ -2409,7 +2410,7 @@ func durableName(workerID, namespace, agent string) string {
 	if base == "" {
 		base = "worker"
 	}
-	return sanitizeSubjectToken(base) + "-" + sanitizeSubjectToken(namespace) + "-" + sanitizeSubjectToken(agent)
+	return sanitizeSubjectToken(base) + "-" + sanitizeSubjectToken(namespace) + "-" + sanitizeSubjectToken(agent) + "-" + agentMessageDurableConfigVersion
 }
 
 func nextAgentsFromSystemForOutput(system resources.AgentSystem, current string, output string, delegateOf string) []string {
