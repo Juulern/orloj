@@ -60,6 +60,7 @@ func main() {
 	toolWASMCacheDir := flag.String("tool-wasm-cache-dir", env("ORLOJ_TOOL_WASM_CACHE_DIR", ""), "disk cache directory for remote WASM modules (default: ~/.orloj/wasm-cache)")
 	cliToolAllowedCommands := flag.String("cli-tool-allowed-commands", env("ORLOJ_CLI_TOOL_ALLOWED_COMMANDS", ""), "comma-separated allowlist of commands for CLI tools (empty allows all)")
 	cliToolMaxArgvLength := flag.Int("cli-tool-max-argv-length", envInt("ORLOJ_CLI_TOOL_MAX_ARGV_LENGTH", 4096), "max total argv byte length for CLI tool invocations")
+	toolAllowPrivateEndpoints := flag.Bool("tool-allow-private-endpoints", envBool("ORLOJ_TOOL_ALLOW_PRIVATE_ENDPOINTS", false), "allow HTTP tools to call trusted private/RFC1918 endpoints (env: ORLOJ_TOOL_ALLOW_PRIVATE_ENDPOINTS)")
 	a2aAllowPrivateEndpoints := flag.Bool("a2a-allow-private-endpoints", envBool("ORLOJ_A2A_ALLOW_PRIVATE_ENDPOINTS", false), "allow outbound A2A requests to private addresses (env: ORLOJ_A2A_ALLOW_PRIVATE_ENDPOINTS)")
 	a2aCardCacheTTL := flag.Duration("a2a-card-cache-ttl", envDuration("ORLOJ_A2A_CARD_CACHE_TTL", 5*time.Minute), "TTL for cached remote Agent Cards (env: ORLOJ_A2A_CARD_CACHE_TTL)")
 	toolK8sEnabled := flag.Bool("tool-k8s-enabled", envBool("ORLOJ_TOOL_K8S_ENABLED", false), "enable kubernetes tool isolation runtime for isolation_mode=kubernetes tools")
@@ -123,7 +124,7 @@ func main() {
 	}
 
 	debugLogger.Printf(
-		"startup config worker_id=%s log_level=%s healthz_enabled=%t region=%s gpu=%t supported_models=%d max_concurrent_tasks=%d storage_backend=%s postgres_dsn_configured=%t task_execution_mode=%s agent_message_consume=%t agent_message_bus_backend=%s agent_message_consumer_namespace=%q tool_isolation_backend=%s tool_container_runtime=%s tool_container_network=%s wasm_module_configured=%t",
+		"startup config worker_id=%s log_level=%s healthz_enabled=%t region=%s gpu=%t supported_models=%d max_concurrent_tasks=%d storage_backend=%s postgres_dsn_configured=%t task_execution_mode=%s agent_message_consume=%t agent_message_bus_backend=%s agent_message_consumer_namespace=%q tool_isolation_backend=%s tool_container_runtime=%s tool_container_network=%s tool_allow_private_endpoints=%t wasm_module_configured=%t",
 		*workerID,
 		resolvedLogLevelLabel,
 		strings.TrimSpace(*healthzAddr) != "",
@@ -140,6 +141,7 @@ func main() {
 		*toolIsolationBackend,
 		*toolContainerRuntime,
 		*toolContainerNetwork,
+		*toolAllowPrivateEndpoints,
 		strings.TrimSpace(*toolWASMModule) != "",
 	)
 
@@ -263,8 +265,9 @@ func main() {
 				AllowedCommands: startup.ParseCSV(*cliToolAllowedCommands),
 				MaxArgvLength:   *cliToolMaxArgvLength,
 			},
-			SecretResolver:  toolSecretResolver,
-			KubernetesTools: k8sTools,
+			SecretResolver:        toolSecretResolver,
+			AllowPrivateHTTPTools: *toolAllowPrivateEndpoints,
+			KubernetesTools:       k8sTools,
 			A2ATools: a2a.NewToolRuntime(a2a.NewClient(a2a.ClientConfig{
 				AllowPrivate: *a2aAllowPrivateEndpoints,
 				CardCacheTTL: *a2aCardCacheTTL,
@@ -383,6 +386,7 @@ func main() {
 		MaxArgvLength:   *cliToolMaxArgvLength,
 	}
 	taskController.SetCliToolRuntime(cliConfig, toolSecretResolver)
+	taskController.SetAllowPrivateHTTPTools(*toolAllowPrivateEndpoints)
 
 	// A2A tool runtime
 	a2aClient := a2a.NewClient(a2a.ClientConfig{
@@ -451,32 +455,33 @@ func main() {
 			consumer := agentruntime.NewAgentMessageConsumerManager(
 				agentMessageBus, stores.Agents, stores.AgentSystems, stores.Tasks, logger,
 				agentruntime.AgentMessageConsumerOptions{
-					WorkerID:            *workerID,
-					Namespace:           *agentMessageConsumerNamespace,
-					RefreshEvery:        *agentMessageConsumerRefresh,
-					DedupeWindow:        *agentMessageConsumerDedupe,
-					LeaseExtendDuration: *leaseDuration,
-					Executor:            taskExecutor,
-					Tools:               stores.Tools,
-					Roles:               stores.Roles,
-					ToolPermissions:     stores.ToolPerms,
-					IsolatedToolRuntime: isolatedToolRuntime,
-					WasmToolRuntime:     wasmToolRuntime,
-					McpSessionManager:   mcpSessionManager,
-					McpServerStore:      stores.McpServers,
-					CliToolConfig:       cliConfig,
-					SecretResolver:      toolSecretResolver,
-					Extensions:          extensions,
-					Memories:            stores.Memories,
-					MemoryBackends:      memoryBackendRegistry,
-					ModelEndpoints:      stores.ModelEPs,
-					ToolApprovals:       stores.ToolApprovals,
-					TaskApprovals:       stores.TaskApprovals,
-					Policies:            stores.Policies,
-				ContextAdapters:     stores.ContextAdapters,
-				A2AToolRuntime:      a2aToolRT,
-				AgentK8sRuntime:     agentK8sRT,
-				DebugLogger:         debugLogger,
+					WorkerID:              *workerID,
+					Namespace:             *agentMessageConsumerNamespace,
+					RefreshEvery:          *agentMessageConsumerRefresh,
+					DedupeWindow:          *agentMessageConsumerDedupe,
+					LeaseExtendDuration:   *leaseDuration,
+					Executor:              taskExecutor,
+					Tools:                 stores.Tools,
+					Roles:                 stores.Roles,
+					ToolPermissions:       stores.ToolPerms,
+					IsolatedToolRuntime:   isolatedToolRuntime,
+					WasmToolRuntime:       wasmToolRuntime,
+					McpSessionManager:     mcpSessionManager,
+					McpServerStore:        stores.McpServers,
+					CliToolConfig:         cliConfig,
+					SecretResolver:        toolSecretResolver,
+					AllowPrivateHTTPTools: *toolAllowPrivateEndpoints,
+					Extensions:            extensions,
+					Memories:              stores.Memories,
+					MemoryBackends:        memoryBackendRegistry,
+					ModelEndpoints:        stores.ModelEPs,
+					ToolApprovals:         stores.ToolApprovals,
+					TaskApprovals:         stores.TaskApprovals,
+					Policies:              stores.Policies,
+					ContextAdapters:       stores.ContextAdapters,
+					A2AToolRuntime:        a2aToolRT,
+					AgentK8sRuntime:       agentK8sRT,
+					DebugLogger:           debugLogger,
 				},
 			)
 			go consumer.Start(ctx)

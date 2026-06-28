@@ -77,6 +77,7 @@ func main() {
 	toolWASMCacheDir := flag.String("tool-wasm-cache-dir", env("ORLOJ_TOOL_WASM_CACHE_DIR", ""), "disk cache directory for remote WASM modules (default: ~/.orloj/wasm-cache)")
 	cliToolAllowedCommands := flag.String("cli-tool-allowed-commands", env("ORLOJ_CLI_TOOL_ALLOWED_COMMANDS", ""), "comma-separated allowlist of commands for CLI tools (empty allows all)")
 	cliToolMaxArgvLength := flag.Int("cli-tool-max-argv-length", envInt("ORLOJ_CLI_TOOL_MAX_ARGV_LENGTH", 4096), "max total argv byte length for CLI tool invocations")
+	toolAllowPrivateEndpoints := flag.Bool("tool-allow-private-endpoints", envBool("ORLOJ_TOOL_ALLOW_PRIVATE_ENDPOINTS", false), "allow HTTP tools to call trusted private/RFC1918 endpoints (env: ORLOJ_TOOL_ALLOW_PRIVATE_ENDPOINTS)")
 	a2aPublicBaseURL := flag.String("a2a-public-base-url", env("ORLOJ_A2A_PUBLIC_BASE_URL", ""), "public base URL for A2A Agent Cards (env: ORLOJ_A2A_PUBLIC_BASE_URL)")
 	a2aProtocolVersion := flag.String("a2a-protocol-version", env("ORLOJ_A2A_PROTOCOL_VERSION", ""), "A2A protocol version to advertise (env: ORLOJ_A2A_PROTOCOL_VERSION)")
 	a2aCardCacheTTL := flag.Duration("a2a-card-cache-ttl", envDuration("ORLOJ_A2A_CARD_CACHE_TTL", 5*time.Minute), "TTL for cached remote Agent Cards (env: ORLOJ_A2A_CARD_CACHE_TTL)")
@@ -344,6 +345,7 @@ func main() {
 		AllowedCommands: startup.ParseCSV(*cliToolAllowedCommands),
 		MaxArgvLength:   *cliToolMaxArgvLength,
 	}, cliSecretResolver)
+	taskController.SetAllowPrivateHTTPTools(*toolAllowPrivateEndpoints)
 
 	// A2A outbound tool runtime — always available so type=a2a tools work
 	// regardless of whether the inbound A2A API is enabled.
@@ -538,29 +540,30 @@ func main() {
 				consumer := agentruntime.NewAgentMessageConsumerManager(
 					agentMessageBus, stores.Agents, stores.AgentSystems, stores.Tasks, logger,
 					agentruntime.AgentMessageConsumerOptions{
-						WorkerID:            *taskWorkerID,
-						RefreshEvery:        10 * time.Second,
-						DedupeWindow:        10 * time.Minute,
-						LeaseExtendDuration: *taskLeaseDuration,
-						Executor:            taskExecutor,
-						Tools:               stores.Tools,
-						Roles:               stores.Roles,
-						ToolPermissions:     stores.ToolPerms,
-						IsolatedToolRuntime: isolatedToolRuntime,
-						WasmToolRuntime:     wasmToolRuntime,
-						McpSessionManager:   mcpSessionManager,
-						McpServerStore:      stores.McpServers,
-						SecretResolver:      cliSecretResolver,
-						Extensions:          extensions,
-						Memories:            stores.Memories,
-						MemoryBackends:      memoryBackendRegistry,
-						ModelEndpoints:      stores.ModelEPs,
-						ToolApprovals:       stores.ToolApprovals,
-						TaskApprovals:       stores.TaskApprovals,
-						Policies:            stores.Policies,
-						ContextAdapters:     stores.ContextAdapters,
-						A2AToolRuntime:      a2aToolRT,
-						DebugLogger:         debugLogger,
+						WorkerID:              *taskWorkerID,
+						RefreshEvery:          10 * time.Second,
+						DedupeWindow:          10 * time.Minute,
+						LeaseExtendDuration:   *taskLeaseDuration,
+						Executor:              taskExecutor,
+						Tools:                 stores.Tools,
+						Roles:                 stores.Roles,
+						ToolPermissions:       stores.ToolPerms,
+						IsolatedToolRuntime:   isolatedToolRuntime,
+						WasmToolRuntime:       wasmToolRuntime,
+						McpSessionManager:     mcpSessionManager,
+						McpServerStore:        stores.McpServers,
+						SecretResolver:        cliSecretResolver,
+						AllowPrivateHTTPTools: *toolAllowPrivateEndpoints,
+						Extensions:            extensions,
+						Memories:              stores.Memories,
+						MemoryBackends:        memoryBackendRegistry,
+						ModelEndpoints:        stores.ModelEPs,
+						ToolApprovals:         stores.ToolApprovals,
+						TaskApprovals:         stores.TaskApprovals,
+						Policies:              stores.Policies,
+						ContextAdapters:       stores.ContextAdapters,
+						A2AToolRuntime:        a2aToolRT,
+						DebugLogger:           debugLogger,
 						OnStepEvent: func(taskName, namespace string, evt agentruntime.AgentStepEvent) {
 							if bus != nil {
 								bus.Publish(eventbus.Event{

@@ -281,6 +281,15 @@ func ConfigureMcpRuntime(rt ToolRuntime, sessionManager *McpSessionManager, mcpS
 // Must be called after BuildGovernedToolRuntimeForAgent* when the caller has a
 // secret resolver available (e.g. a store-backed resolver in the worker).
 func ConfigureHttpRuntime(rt ToolRuntime, secrets SecretResolver, namespace string) {
+	ConfigureHttpRuntimeWithOptions(rt, secrets, namespace, HTTPRuntimeOptions{})
+}
+
+// HTTPRuntimeOptions controls HTTP tool transport behavior.
+type HTTPRuntimeOptions struct {
+	AllowPrivateEndpoints bool
+}
+
+func ConfigureHttpRuntimeWithOptions(rt ToolRuntime, secrets SecretResolver, namespace string, opts HTTPRuntimeOptions) {
 	governed, ok := rt.(*GovernedToolRuntime)
 	if !ok || governed == nil {
 		return
@@ -288,7 +297,11 @@ func ConfigureHttpRuntime(rt ToolRuntime, secrets SecretResolver, namespace stri
 	if secrets == nil {
 		secrets = NewEnvSecretResolver("ORLOJ_SECRET_")
 	}
-	var httpRT ToolRuntime = NewHTTPToolClient(governed.registry, secrets, nil)
+	httpClient := NewHTTPToolClient(governed.registry, secrets, nil)
+	if opts.AllowPrivateEndpoints {
+		httpClient.SetAllowPrivateEndpoints(true)
+	}
+	var httpRT ToolRuntime = httpClient
 	if scoped, ok := httpRT.(namespaceAwareToolRuntime); ok {
 		httpRT = scoped.WithNamespace(namespace)
 	}

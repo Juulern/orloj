@@ -25,39 +25,40 @@ var traceStepIDPattern = regexp.MustCompile(`^a([0-9]+)\.s([0-9]+)$`) //nolint:g
 
 // TaskController reconciles Task resources.
 type TaskController struct {
-	taskStore           *store.TaskStore
-	agentSystemStore    *store.AgentSystemStore
-	agentStore          *store.AgentStore
-	toolStore           *store.ToolStore
-	memoryStore         *store.MemoryStore
-	policyStore         *store.AgentPolicyStore
-	modelEPStore        *store.ModelEndpointStore
-	roleStore           *store.AgentRoleStore
-	toolPermStore       *store.ToolPermissionStore
-	toolApprovalStore   *store.ToolApprovalStore
-	taskApprovalStore   *store.TaskApprovalStore
-	workerStore         *store.WorkerStore
-	executor            *agentruntime.TaskExecutor
-	reconcileEvery      time.Duration
-	leaseDuration       time.Duration
-	heartbeatEvery      time.Duration
-	workerID            string
-	logger              *log.Logger
-	debugLogger         *log.Logger
-	eventBus            eventbus.Bus
-	agentMessageBus     agentruntime.AgentMessageBus
-	executionMode       string
-	isolatedTools       agentruntime.ToolRuntime
-	wasmTools           agentruntime.ToolRuntime
-	kubernetesTools     agentruntime.ToolRuntime
-	a2aTools            agentruntime.ToolRuntime
-	cliToolConfig       agentruntime.CLIToolRuntimeConfig
-	cliSecretResolver   agentruntime.SecretResolver
-	mcpSessionMgr       *agentruntime.McpSessionManager
-	mcpServerStore      *store.McpServerStore
-	contextAdapterStore *store.ContextAdapterStore
-	extensions          agentruntime.Extensions
-	agentK8sRuntime     *agentruntime.KubernetesAgentRuntime
+	taskStore             *store.TaskStore
+	agentSystemStore      *store.AgentSystemStore
+	agentStore            *store.AgentStore
+	toolStore             *store.ToolStore
+	memoryStore           *store.MemoryStore
+	policyStore           *store.AgentPolicyStore
+	modelEPStore          *store.ModelEndpointStore
+	roleStore             *store.AgentRoleStore
+	toolPermStore         *store.ToolPermissionStore
+	toolApprovalStore     *store.ToolApprovalStore
+	taskApprovalStore     *store.TaskApprovalStore
+	workerStore           *store.WorkerStore
+	executor              *agentruntime.TaskExecutor
+	reconcileEvery        time.Duration
+	leaseDuration         time.Duration
+	heartbeatEvery        time.Duration
+	workerID              string
+	logger                *log.Logger
+	debugLogger           *log.Logger
+	eventBus              eventbus.Bus
+	agentMessageBus       agentruntime.AgentMessageBus
+	executionMode         string
+	isolatedTools         agentruntime.ToolRuntime
+	wasmTools             agentruntime.ToolRuntime
+	kubernetesTools       agentruntime.ToolRuntime
+	a2aTools              agentruntime.ToolRuntime
+	cliToolConfig         agentruntime.CLIToolRuntimeConfig
+	cliSecretResolver     agentruntime.SecretResolver
+	allowPrivateHTTPTools bool
+	mcpSessionMgr         *agentruntime.McpSessionManager
+	mcpServerStore        *store.McpServerStore
+	contextAdapterStore   *store.ContextAdapterStore
+	extensions            agentruntime.Extensions
+	agentK8sRuntime       *agentruntime.KubernetesAgentRuntime
 }
 
 func NewTaskController(
@@ -213,6 +214,10 @@ func (c *TaskController) SetMcpRuntime(sessionMgr *agentruntime.McpSessionManage
 func (c *TaskController) SetCliToolRuntime(config agentruntime.CLIToolRuntimeConfig, secrets agentruntime.SecretResolver) {
 	c.cliToolConfig = config
 	c.cliSecretResolver = secrets
+}
+
+func (c *TaskController) SetAllowPrivateHTTPTools(allow bool) {
+	c.allowPrivateHTTPTools = allow
 }
 
 func (c *TaskController) Start(ctx context.Context) {
@@ -1896,7 +1901,9 @@ func (c *TaskController) executeTask(ctx context.Context, task *resources.Task, 
 		if c.mcpSessionMgr != nil && c.mcpServerStore != nil {
 			agentruntime.ConfigureMcpRuntime(toolRuntime, c.mcpSessionMgr, c.mcpServerStore, task.Metadata.Namespace)
 		}
-		agentruntime.ConfigureHttpRuntime(toolRuntime, c.cliSecretResolver, task.Metadata.Namespace)
+		agentruntime.ConfigureHttpRuntimeWithOptions(toolRuntime, c.cliSecretResolver, task.Metadata.Namespace, agentruntime.HTTPRuntimeOptions{
+			AllowPrivateEndpoints: c.allowPrivateHTTPTools,
+		})
 		agentruntime.ConfigureCliRuntime(toolRuntime, c.cliSecretResolver, nil, c.cliToolConfig, task.Metadata.Namespace)
 		agentruntime.ConfigureExternalRuntime(toolRuntime, c.cliSecretResolver, task.Metadata.Namespace)
 		agentruntime.ConfigureGRPCRuntime(toolRuntime, c.cliSecretResolver, task.Metadata.Namespace)
@@ -2358,7 +2365,9 @@ func (c *TaskController) executeTaskFromResume(
 		if c.mcpSessionMgr != nil && c.mcpServerStore != nil {
 			agentruntime.ConfigureMcpRuntime(toolRuntime, c.mcpSessionMgr, c.mcpServerStore, task.Metadata.Namespace)
 		}
-		agentruntime.ConfigureHttpRuntime(toolRuntime, c.cliSecretResolver, task.Metadata.Namespace)
+		agentruntime.ConfigureHttpRuntimeWithOptions(toolRuntime, c.cliSecretResolver, task.Metadata.Namespace, agentruntime.HTTPRuntimeOptions{
+			AllowPrivateEndpoints: c.allowPrivateHTTPTools,
+		})
 		agentruntime.ConfigureCliRuntime(toolRuntime, c.cliSecretResolver, nil, c.cliToolConfig, task.Metadata.Namespace)
 		agentruntime.ConfigureExternalRuntime(toolRuntime, c.cliSecretResolver, task.Metadata.Namespace)
 		agentruntime.ConfigureGRPCRuntime(toolRuntime, c.cliSecretResolver, task.Metadata.Namespace)

@@ -56,35 +56,36 @@ type ContextAdapterGetter interface {
 
 // AgentMessageConsumerOptions configures inbox consumers in a worker.
 type AgentMessageConsumerOptions struct {
-	WorkerID            string
-	Namespace           string
-	RefreshEvery        time.Duration
-	DedupeWindow        time.Duration
-	ConsumerDelay       time.Duration
-	LeaseExtendDuration time.Duration
-	Executor            *TaskExecutor
-	Tools               ToolResourceLookup
-	Roles               AgentRoleLookup
-	ToolPermissions     ToolPermissionLookup
-	IsolatedToolRuntime ToolRuntime
-	WasmToolRuntime     ToolRuntime
-	CliToolConfig       CLIToolRuntimeConfig
-	SecretResolver      SecretResolver
-	McpSessionManager   *McpSessionManager
-	McpServerStore      McpServerLookup
-	Extensions          Extensions
-	Memories            MemoryResourceLookup
-	MemoryBackends      *PersistentMemoryBackendRegistry
-	ModelEndpoints      resources.ModelEndpointLookup
-	ToolApprovals       ToolApprovalUpserter
-	TaskApprovals       TaskApprovalUpserter
-	Policies            AgentPolicyLookup
-	ContextAdapters     ContextAdapterGetter
-	KubernetesToolRT    ToolRuntime
-	A2AToolRuntime      ToolRuntime
-	AgentK8sRuntime     *KubernetesAgentRuntime
-	OnStepEvent         func(taskName, namespace string, evt AgentStepEvent)
-	DebugLogger         *log.Logger
+	WorkerID              string
+	Namespace             string
+	RefreshEvery          time.Duration
+	DedupeWindow          time.Duration
+	ConsumerDelay         time.Duration
+	LeaseExtendDuration   time.Duration
+	Executor              *TaskExecutor
+	Tools                 ToolResourceLookup
+	Roles                 AgentRoleLookup
+	ToolPermissions       ToolPermissionLookup
+	IsolatedToolRuntime   ToolRuntime
+	WasmToolRuntime       ToolRuntime
+	CliToolConfig         CLIToolRuntimeConfig
+	SecretResolver        SecretResolver
+	AllowPrivateHTTPTools bool
+	McpSessionManager     *McpSessionManager
+	McpServerStore        McpServerLookup
+	Extensions            Extensions
+	Memories              MemoryResourceLookup
+	MemoryBackends        *PersistentMemoryBackendRegistry
+	ModelEndpoints        resources.ModelEndpointLookup
+	ToolApprovals         ToolApprovalUpserter
+	TaskApprovals         TaskApprovalUpserter
+	Policies              AgentPolicyLookup
+	ContextAdapters       ContextAdapterGetter
+	KubernetesToolRT      ToolRuntime
+	A2AToolRuntime        ToolRuntime
+	AgentK8sRuntime       *KubernetesAgentRuntime
+	OnStepEvent           func(taskName, namespace string, evt AgentStepEvent)
+	DebugLogger           *log.Logger
 }
 
 // ToolApprovalUpserter persists ToolApproval resources when a governed tool requires approval.
@@ -100,45 +101,46 @@ type TaskApprovalUpserter interface {
 
 // AgentMessageConsumerManager watches agents and consumes runtime inbox messages per agent.
 type AgentMessageConsumerManager struct {
-	bus             AgentMessageBus
-	agents          AgentRegistry
-	systems         AgentSystemRegistry
-	tasks           TaskStateStore
-	tools           ToolResourceLookup
-	roles           AgentRoleLookup
-	toolPerms       ToolPermissionLookup
-	isolated        ToolRuntime
-	wasmRT          ToolRuntime
-	cliConfig       CLIToolRuntimeConfig
-	secretResolver  SecretResolver
-	mcpSessionMgr   *McpSessionManager
-	mcpServerStore  McpServerLookup
-	executor        *TaskExecutor
-	logger          *log.Logger
-	debugLogger     *log.Logger
-	workerID        string
-	namespace       string
-	refresh         time.Duration
-	dedupeTTL       time.Duration
-	retryDelay      time.Duration
-	leaseExtend     time.Duration
-	extensions      Extensions
-	memories        MemoryResourceLookup
-	memBackends     *PersistentMemoryBackendRegistry
-	modelEPs        resources.ModelEndpointLookup
-	toolApprovals   ToolApprovalUpserter
-	taskApprovals   TaskApprovalUpserter
-	policies        AgentPolicyLookup
-	contextAdapters ContextAdapterGetter
-	kubernetesTools ToolRuntime
-	a2aTools        ToolRuntime
-	agentK8sRuntime *KubernetesAgentRuntime
-	onStepEvent     func(taskName, namespace string, evt AgentStepEvent)
-	mu              sync.Mutex
-	consumers       map[string]context.CancelFunc
-	seenMessage     map[string]time.Time
-	taskMemory      map[string]*SharedMemoryStore
-	taskMemoryMu    sync.Mutex
+	bus                   AgentMessageBus
+	agents                AgentRegistry
+	systems               AgentSystemRegistry
+	tasks                 TaskStateStore
+	tools                 ToolResourceLookup
+	roles                 AgentRoleLookup
+	toolPerms             ToolPermissionLookup
+	isolated              ToolRuntime
+	wasmRT                ToolRuntime
+	cliConfig             CLIToolRuntimeConfig
+	secretResolver        SecretResolver
+	allowPrivateHTTPTools bool
+	mcpSessionMgr         *McpSessionManager
+	mcpServerStore        McpServerLookup
+	executor              *TaskExecutor
+	logger                *log.Logger
+	debugLogger           *log.Logger
+	workerID              string
+	namespace             string
+	refresh               time.Duration
+	dedupeTTL             time.Duration
+	retryDelay            time.Duration
+	leaseExtend           time.Duration
+	extensions            Extensions
+	memories              MemoryResourceLookup
+	memBackends           *PersistentMemoryBackendRegistry
+	modelEPs              resources.ModelEndpointLookup
+	toolApprovals         ToolApprovalUpserter
+	taskApprovals         TaskApprovalUpserter
+	policies              AgentPolicyLookup
+	contextAdapters       ContextAdapterGetter
+	kubernetesTools       ToolRuntime
+	a2aTools              ToolRuntime
+	agentK8sRuntime       *KubernetesAgentRuntime
+	onStepEvent           func(taskName, namespace string, evt AgentStepEvent)
+	mu                    sync.Mutex
+	consumers             map[string]context.CancelFunc
+	seenMessage           map[string]time.Time
+	taskMemory            map[string]*SharedMemoryStore
+	taskMemoryMu          sync.Mutex
 }
 
 func NewAgentMessageConsumerManager(
@@ -170,43 +172,44 @@ func NewAgentMessageConsumerManager(
 		executor = NewTaskExecutor(logger)
 	}
 	return &AgentMessageConsumerManager{
-		bus:             bus,
-		agents:          agents,
-		systems:         systems,
-		tasks:           tasks,
-		tools:           opts.Tools,
-		roles:           opts.Roles,
-		toolPerms:       opts.ToolPermissions,
-		isolated:        opts.IsolatedToolRuntime,
-		wasmRT:          opts.WasmToolRuntime,
-		cliConfig:       opts.CliToolConfig,
-		secretResolver:  opts.SecretResolver,
-		mcpSessionMgr:   opts.McpSessionManager,
-		mcpServerStore:  opts.McpServerStore,
-		executor:        executor,
-		logger:          logger,
-		debugLogger:     opts.DebugLogger,
-		workerID:        strings.TrimSpace(opts.WorkerID),
-		namespace:       strings.TrimSpace(opts.Namespace),
-		refresh:         refresh,
-		dedupeTTL:       dedupe,
-		retryDelay:      retry,
-		leaseExtend:     lease,
-		memories:        opts.Memories,
-		memBackends:     opts.MemoryBackends,
-		modelEPs:        opts.ModelEndpoints,
-		toolApprovals:   opts.ToolApprovals,
-		taskApprovals:   opts.TaskApprovals,
-		policies:        opts.Policies,
-		contextAdapters: opts.ContextAdapters,
-		kubernetesTools: opts.KubernetesToolRT,
-		a2aTools:        opts.A2AToolRuntime,
-		agentK8sRuntime: opts.AgentK8sRuntime,
-		onStepEvent:     opts.OnStepEvent,
-		extensions:      NormalizeExtensions(opts.Extensions),
-		consumers:       make(map[string]context.CancelFunc),
-		seenMessage:     make(map[string]time.Time),
-		taskMemory:      make(map[string]*SharedMemoryStore),
+		bus:                   bus,
+		agents:                agents,
+		systems:               systems,
+		tasks:                 tasks,
+		tools:                 opts.Tools,
+		roles:                 opts.Roles,
+		toolPerms:             opts.ToolPermissions,
+		isolated:              opts.IsolatedToolRuntime,
+		wasmRT:                opts.WasmToolRuntime,
+		cliConfig:             opts.CliToolConfig,
+		secretResolver:        opts.SecretResolver,
+		allowPrivateHTTPTools: opts.AllowPrivateHTTPTools,
+		mcpSessionMgr:         opts.McpSessionManager,
+		mcpServerStore:        opts.McpServerStore,
+		executor:              executor,
+		logger:                logger,
+		debugLogger:           opts.DebugLogger,
+		workerID:              strings.TrimSpace(opts.WorkerID),
+		namespace:             strings.TrimSpace(opts.Namespace),
+		refresh:               refresh,
+		dedupeTTL:             dedupe,
+		retryDelay:            retry,
+		leaseExtend:           lease,
+		memories:              opts.Memories,
+		memBackends:           opts.MemoryBackends,
+		modelEPs:              opts.ModelEndpoints,
+		toolApprovals:         opts.ToolApprovals,
+		taskApprovals:         opts.TaskApprovals,
+		policies:              opts.Policies,
+		contextAdapters:       opts.ContextAdapters,
+		kubernetesTools:       opts.KubernetesToolRT,
+		a2aTools:              opts.A2AToolRuntime,
+		agentK8sRuntime:       opts.AgentK8sRuntime,
+		onStepEvent:           opts.OnStepEvent,
+		extensions:            NormalizeExtensions(opts.Extensions),
+		consumers:             make(map[string]context.CancelFunc),
+		seenMessage:           make(map[string]time.Time),
+		taskMemory:            make(map[string]*SharedMemoryStore),
 	}
 }
 
@@ -591,7 +594,9 @@ func (m *AgentMessageConsumerManager) processMessage(ctx context.Context, taskKe
 	if m.mcpSessionMgr != nil && m.mcpServerStore != nil {
 		ConfigureMcpRuntime(toolRT, m.mcpSessionMgr, m.mcpServerStore, ns)
 	}
-	ConfigureHttpRuntime(toolRT, m.secretResolver, ns)
+	ConfigureHttpRuntimeWithOptions(toolRT, m.secretResolver, ns, HTTPRuntimeOptions{
+		AllowPrivateEndpoints: m.allowPrivateHTTPTools,
+	})
 	ConfigureCliRuntime(toolRT, m.secretResolver, nil, m.cliConfig, ns)
 	ConfigureExternalRuntime(toolRT, m.secretResolver, ns)
 	ConfigureGRPCRuntime(toolRT, m.secretResolver, ns)

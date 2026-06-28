@@ -21,14 +21,15 @@ type SingleAgentConfig struct {
 	ModelSecretEnvPrefix string
 	ToolSecretEnvPrefix  string
 
-	IsolatedToolRuntime agentruntime.ToolRuntime
-	WasmToolRuntime     agentruntime.ToolRuntime
-	McpSessionManager   *agentruntime.McpSessionManager
-	CliToolConfig       agentruntime.CLIToolRuntimeConfig
-	SecretResolver      agentruntime.SecretResolver
-	Extensions          agentruntime.Extensions
-	KubernetesTools     agentruntime.ToolRuntime
-	A2ATools            agentruntime.ToolRuntime
+	IsolatedToolRuntime   agentruntime.ToolRuntime
+	WasmToolRuntime       agentruntime.ToolRuntime
+	McpSessionManager     *agentruntime.McpSessionManager
+	CliToolConfig         agentruntime.CLIToolRuntimeConfig
+	SecretResolver        agentruntime.SecretResolver
+	AllowPrivateHTTPTools bool
+	Extensions            agentruntime.Extensions
+	KubernetesTools       agentruntime.ToolRuntime
+	A2ATools              agentruntime.ToolRuntime
 }
 
 // RunSingleAgent loads a task and agent from the stores, executes the agent,
@@ -114,7 +115,9 @@ func RunSingleAgent(ctx context.Context, stores *StoreSet, cfg SingleAgentConfig
 	if cfg.McpSessionManager != nil {
 		agentruntime.ConfigureMcpRuntime(toolRuntime, cfg.McpSessionManager, stores.McpServers, ns)
 	}
-	agentruntime.ConfigureHttpRuntime(toolRuntime, cfg.SecretResolver, ns)
+	agentruntime.ConfigureHttpRuntimeWithOptions(toolRuntime, cfg.SecretResolver, ns, agentruntime.HTTPRuntimeOptions{
+		AllowPrivateEndpoints: cfg.AllowPrivateHTTPTools,
+	})
 	agentruntime.ConfigureCliRuntime(toolRuntime, cfg.SecretResolver, nil, cfg.CliToolConfig, ns)
 	agentruntime.ConfigureExternalRuntime(toolRuntime, cfg.SecretResolver, ns)
 	agentruntime.ConfigureGRPCRuntime(toolRuntime, cfg.SecretResolver, ns)
